@@ -82,3 +82,73 @@ function SL(title, frames, minH) {
 function triAngles(P) { const a = []; for (let i = 0; i < 3; i++) { const v = P[i], p = P[(i + 1) % 3], q = P[(i + 2) % 3]; const u = G.sub(p, v), w = G.sub(q, v); a.push(Math.acos((u[0] * w[0] + u[1] * w[1]) / (Math.hypot(...u) * Math.hypot(...w))) * 180 / Math.PI); } const r = a.map(Math.round); r[2] = 180 - r[0] - r[1]; return r; }
 const LETTERS = [['A', 'B', 'C'], ['P', 'Q', 'R'], ['X', 'Y', 'Z'], ['D', 'E', 'F'], ['L', 'M', 'N'], ['H', 'K', 'J'], ['S', 'T', 'U']];
 const TRI = '△';
+
+/* ================= proofs: reasons, blanks, animated proofs ================= */
+/* reasons in the worksheets' abbreviated form; p, q = names of parallel lines */
+function RSN(k, p = 'AB', q = 'CD') {
+  const D = {
+    given: ['given', '已知'], cside: ['common side', '公共邊'], cang: ['common ∠', '公共角'],
+    adj: ['adj. ∠s on st. line', '直線上的鄰角'], adjS: ['adj. ∠s supp.', '鄰角互補'], pt: ['∠s at a pt.', '同頂角'], vert: ['vert. opp. ∠s', '對頂角'],
+    corr: [`corr. ∠s, ${p} // ${q}`, `同位角，${p} // ${q}`], alt: [`alt. ∠s, ${p} // ${q}`, `內錯角，${p} // ${q}`], int: [`int. ∠s, ${p} // ${q}`, `同旁內角，${p} // ${q}`],
+    corrE: ['corr. ∠s equal', '同位角相等'], altE: ['alt. ∠s equal', '內錯角相等'], intS: ['int. ∠s supp.', '同旁內角互補'],
+    sum: ['∠ sum of △', '三角形內角和'], ext: ['ext. ∠ of △', '三角形外角'], base: ['base ∠s, isos. △', '等腰三角形底角'], sopp: ['sides opp. equal ∠s', '等角對邊相等'],
+    SSS: ['SSS', 'S.S.S.'], SAS: ['SAS', 'S.A.S.'], ASA: ['ASA', 'A.S.A.'], AAS: ['AAS', 'A.A.S.'], RHS: ['RHS', 'R.H.S.'],
+    csC: ['corr. sides, ≅△s', '全等三角形的對應邊'], caC: ['corr. ∠s, ≅△s', '全等三角形的對應角'],
+    AAA: ['AAA', 'A.A.A.'], s3: ['3 sides prop.', '三邊成比例'], s2: ['ratio of 2 sides, inc. ∠', '兩邊成比例且夾角相等'],
+    csS: ['corr. sides, ~△s', '相似三角形的對應邊'], caS: ['corr. ∠s, ~△s', '相似三角形的對應角'],
+    polyI: ['∠ sum of polygon', '多邊形內角和'], polyE: ['sum of ext. ∠s of polygon', '多邊形外角和'], equil: ['prop. of equil. △', '等邊三角形的特性']
+  };
+  return D[k];
+}
+/* option label for a drop-down (plain text) */
+function rlab(k, p, q) { const [e, z] = RSN(k, p, q); return LANG === 'en' ? e : LANG === 'zh' ? z : `${e}  ${z}`; }
+/* reason in brackets for display (HTML, bilingual) */
+function rsn(k, p, q) { const [e, z] = RSN(k, p, q); return `<span class="rsn">(${e})<span class="zh">${z}</span></span>`; }
+/* a blank whose correct answer is reason k; wrong = other reason keys */
+function RB(k, wrong, p, q) { return { opts: [rlab(k, p, q), ...wrong.filter(w => w !== k).map(w => rlab(w, p, q))] }; }
+/* a blank with plain-text options (first is correct) */
+function TB(right, wrong) { const seen = new Set([right]); return { opts: [right, ...wrong.filter(w => !seen.has(w) && seen.add(w))] }; }
+/* all orderings of three letters, used for naming blanks: correct first */
+function nameOpts(right) { const [a, b, c] = right.replace('△', '').split(''); return [right, ...[[a, c, b], [b, a, c], [c, b, a], [b, c, a]].map(x => '△' + x.join(''))].slice(0, 4); }
+/* proof steps for the solution list: a line with its reason */
+const PS = (stmt, k, p, q, why) => `${stmt} &nbsp;${k ? rsn(k, p, q) : ''}${why ? `<div class="sub" style="font-size:.85em">💡 ${why}</div>` : ''}`;
+
+/* animated worked proof: figs[i] (or the last given) is shown with proof lines 0..i */
+/* lines: [{s: statement HTML, r: reason key | null, p, q, c:[en,zh] caption, fig: svg (optional)}] */
+function PA(title, intro, fig0, lines, minH) {
+  const frames = [{ h: `<div>${fig0}</div>`, c: intro }];
+  let fig = fig0;
+  lines.forEach((ln, i) => {
+    if (ln.fig) fig = ln.fig;
+    const box = `<div class="pbox">${lines.slice(0, i + 1).map((l, j) => `<div class="pr ${j === i ? 'cur' : 'old'}"><span>${l.s}</span>${l.r ? rsn(l.r, l.p, l.q) : ''}</div>`).join('')}</div>`;
+    frames.push({ h: `<div>${fig}</div>${box}`, c: ln.c, d: 3800 });
+  });
+  return SL(title, frames, minH || 420);
+}
+
+/* general proof figure.
+   spec = {P:{A:[x,y],..}, segs:['AB',..], ticks:{AB:1}, arrows:{AB:1}, arcs:[{v,a,b,n,lab,c}], rights:[{v,a,b}],
+           hl:['AC'] (highlight sides), hlA:[{v,a,b}] (highlight angles), labs:{AB:'5'}, w, h, noNames:[...]} */
+function GF(spec) {
+  const P = spec.P, pts = Object.values(P); const c = G.cen(pts);
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const W = spec.w || Math.max(...xs) + 40, H = spec.h || Math.max(...ys) + 40;
+  const sg = k => [P[k[0]], P[k[1]]];
+  let s = G.open(W, H);
+  (spec.fill || []).forEach(f => { s += G.poly(f.split('').map(k => P[k]), { fill: '#eef2ff', c: 'none', w: 0 }); });
+  (spec.hl || []).forEach(k => { const [a, b] = sg(k); s += G.line(a, b, { c: '#f59e0b', w: 9 }).replace('stroke-linecap="round"', 'stroke-linecap="round" opacity=".55"'); });
+  (spec.hlA || []).forEach(o => { const v = P[o.v], r = 34; const a1 = Math.atan2(P[o.a][1] - v[1], P[o.a][0] - v[0]); let d = Math.atan2(P[o.b][1] - v[1], P[o.b][0] - v[0]) - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d <= -Math.PI) d += 2 * Math.PI;
+    const p1 = [v[0] + r * Math.cos(a1), v[1] + r * Math.sin(a1)], p2 = [v[0] + r * Math.cos(a1 + d), v[1] + r * Math.sin(a1 + d)];
+    s += `<path d="M${v[0]},${v[1]} L${p1[0].toFixed(1)},${p1[1].toFixed(1)} A${r},${r} 0 0 ${d > 0 ? 1 : 0} ${p2[0].toFixed(1)},${p2[1].toFixed(1)} Z" fill="rgba(245,158,11,.45)"/>`; });
+  (spec.segs || []).forEach(k => { const [a, b] = sg(k); s += G.line(a, b, spec.dash && spec.dash.includes(k) ? { dash: '6 5', c: '#64748b' } : {}); });
+  for (const k in spec.ticks || {}) { const [a, b] = sg(k); s += G.ticks(a, b, spec.ticks[k]); }
+  for (const k in spec.arrows || {}) { const [a, b] = sg(k); s += G.arrows(a, b, spec.arrows[k]); }
+  (spec.rights || []).forEach(o => { s += G.right(P[o.v], P[o.a], P[o.b]); });
+  (spec.arcs || []).filter(o => o.sec).forEach(o => { const v = P[o.v], r = (o.r || 22) + 2; const a1 = Math.atan2(P[o.a][1] - v[1], P[o.a][0] - v[0]); let d = Math.atan2(P[o.b][1] - v[1], P[o.b][0] - v[0]) - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d <= -Math.PI) d += 2 * Math.PI;
+    const p1 = [v[0] + r * Math.cos(a1), v[1] + r * Math.sin(a1)], p2 = [v[0] + r * Math.cos(a1 + d), v[1] + r * Math.sin(a1 + d)];
+    s += `<path d="M${v[0]},${v[1]} L${p1[0].toFixed(1)},${p1[1].toFixed(1)} A${r},${r} 0 0 ${d > 0 ? 1 : 0} ${p2[0].toFixed(1)},${p2[1].toFixed(1)} Z" fill="${o.n === 2 ? 'rgba(37,99,235,.18)' : 'rgba(220,38,38,.16)'}"/>`; });
+  (spec.arcs || []).forEach(o => { s += G.arc(P[o.v], P[o.a], P[o.b], { n: o.n || 1, label: o.lab, c: o.c || G.COL.a, r: o.r || 22, italic: o.lab && /^[a-z]$/.test(o.lab) }); });
+  for (const k in spec.labs || {}) { const [a, b] = sg(k); s += G.slabel(a, b, c, spec.labs[k]); }
+  for (const k in P) { if ((spec.noNames || []).includes(k)) continue; if (spec.off && spec.off[k]) s += G.txt(G.add(P[k], spec.off[k]), k, { size: 15, italic: true }); else s += G.vlabel(P[k], c, k); }
+  return s + '</svg>';
+}

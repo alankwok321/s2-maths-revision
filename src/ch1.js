@@ -34,8 +34,8 @@
 
   const condSlides = () => SL(L('3 ways to show triangles are similar', '證明三角形相似的 3 個方法'), [
     { h: simFig('AAA', ['A', 'B', 'C'], ['P', 'Q', 'R'], { base: SHAPES[0], rot: 0, flip: false, k: 1.5 }) + '<div class="ex"><b>AAA</b></div>', c: ['AAA: all angles equal. (2 equal angles are enough — the 3rd must match.)', 'A.A.A.：三角都相等。（兩角相等已足夠，第三角必定相等。）'] },
-    { h: simFig('SSS', ['A', 'B', 'C'], ['P', 'Q', 'R'], { base: SHAPES[0], rot: 0, flip: false, k: 1.5 }) + '<div class="ex"><b>3 sides proportional</b></div>', c: ['All 3 pairs of sides have the same ratio.', '三對邊的比都相同。'] },
-    { h: simFig('SAS', ['A', 'B', 'C'], ['P', 'Q', 'R'], { base: SHAPES[0], rot: 0, flip: false, k: 1.5 }) + '<div class="ex"><b>2 sides prop., inc. ∠ equal</b></div>', c: ['2 pairs of sides same ratio, and the angle between them equal.', '兩對邊的比相同，且夾角相等。'] }
+    { h: simFig('SSS', ['A', 'B', 'C'], ['P', 'Q', 'R'], { base: SHAPES[0], rot: 0, flip: false, k: 1.5 }) + '<div class="ex"><b>3 sides prop.</b></div>', c: ['All 3 pairs of sides have the same ratio.', '三對邊的比都相同。'] },
+    { h: simFig('SAS', ['A', 'B', 'C'], ['P', 'Q', 'R'], { base: SHAPES[0], rot: 0, flip: false, k: 1.5 }) + '<div class="ex"><b>ratio of 2 sides, inc. ∠</b></div>', c: ['2 pairs of sides same ratio, and the angle between them equal.', '兩對邊的比相同，且夾角相等。'] }
   ], 300);
 
   const parFig = (lab) => { const A = [120, 10], Bp = [10, 200], C = [260, 200]; const D = [76, 86], E = [176, 86];
@@ -51,7 +51,7 @@
     },
     {
       t: ['Conditions for similar triangles', '相似三角形的條件'],
-      body: `<table class="t"><tr><td><b>AAA</b></td><td>${L('3 angles equal', '三角相等')}</td></tr><tr><td><b>3 sides proportional</b></td><td>${L('三邊成比例', '三邊成比例')}</td></tr><tr><td><b>2 sides prop., inc. ∠ equal</b></td><td>${L('兩邊成比例且夾角相等', '兩邊成比例且夾角相等')}</td></tr></table>`,
+      body: `<table class="t"><tr><td><b>AAA</b></td><td>${L('3 angles equal', '三角相等')}</td></tr><tr><td><b>3 sides prop.</b></td><td>${L('三邊成比例', '三邊成比例')}</td></tr><tr><td><b>ratio of 2 sides, inc. ∠</b></td><td>${L('兩邊成比例且夾角相等', '兩邊成比例且夾角相等')}</td></tr></table>`,
       anim: condSlides
     },
     {
@@ -81,7 +81,7 @@
   ];
 
   const N = () => shuffle(LETTERS).slice(0, 2);
-  const CN = { AAA: 'AAA', SSS: '3 sides proportional', SAS: '2 sides prop., inc. ∠ equal', NO: L('Not similar / not enough info', '不相似 / 資料不足') };
+  const CN = { AAA: 'AAA', SSS: '3 sides prop.', SAS: 'ratio of 2 sides, inc. ∠', NO: L('Not similar / not enough info', '不相似 / 資料不足') };
   const gens = [
     {
       id: 'cond', name: ['Which condition?', '哪個條件？'], gen() {
@@ -138,6 +138,6 @@
     lessons, gens,
     keys: [B('~ means same shape; sizes can differ.', '~ 表示形狀相同，大小可以不同。'), B('Conditions: AAA; 3 sides proportional; 2 sides prop., inc. ∠ equal.', '條件：A.A.A.；三邊成比例；兩邊成比例且夾角相等。'), B('Corresponding sides: same ratio. Corresponding angles: equal.', '對應邊比相同；對應角相等。'), B('DE // BC → △ADE ~ △ABC.', 'DE // BC → △ADE ~ △ABC。')],
     traps: [B('✘ Using DB instead of AB for the big triangle', '✘ 大三角形用了 DB 而不是 AB'), B('✘ Mixing up the order of the ratio (big/small vs small/big)', '✘ 比的次序混亂（大/小 與 小/大）'), B('✘ Similar means equal sides &nbsp; ✔ only proportional', '✘ 相似即邊相等 &nbsp; ✔ 只是成比例')],
-    cheat: [`AAA · 3 sides prop. · 2 sides prop., inc. ∠`, `${fr('AB', 'PQ')} = ${fr('BC', 'QR')} = ${fr('CA', 'RP')}`, 'DE // BC → △ADE ~ △ABC']
+    cheat: [`AAA · 3 sides prop. · ratio of 2 sides, inc. ∠`, `${fr('AB', 'PQ')} = ${fr('BC', 'QR')} = ${fr('CA', 'RP')}`, 'DE // BC → △ADE ~ △ABC']
   });
 })();

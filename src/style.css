@@ -216,3 +216,16 @@ table.sl th{font-family:"Nunito",sans-serif;font-size:.8em;padding:2px 8px;color
 .katex .hl3{background:#c9f2d4;border-radius:4px;box-shadow:0 0 0 2px #c9f2d4}
 .katex .red{color:var(--bad)}.katex .green{color:var(--ok)}.katex .blue{color:var(--pri)}.katex .org{color:#c2410c}.katex .pur{color:var(--pur)}
 .mcs .katex{font-size:1.1em}
+/* proofs */
+.proof{font-size:1.1em;line-height:1.9;margin-top:12px;background:#fff;border:2px dashed #c7d2fe;border-radius:12px;padding:10px 14px}
+.proof .pl{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;min-height:2.1em;line-height:1.4;padding:5px 0}
+select.pb{font:inherit;font-size:.86em;padding:3px 8px;border:2px solid #a5b4fc;border-radius:8px;background:#eef2ff;color:var(--ink);max-width:100%;cursor:pointer}
+select.pb.set{border-color:var(--pri)}
+select.pb.right{border-color:var(--ok);background:var(--ok-soft);opacity:1}
+select.pb.wrong{border-color:var(--bad);background:var(--bad-soft);opacity:1}
+.pbox{text-align:left;font-size:1.12em;line-height:1.9;background:#fff;border:2px solid var(--line);border-radius:12px;padding:10px 16px;margin:10px auto 0;max-width:600px}
+.pbox .pr{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;padding:1px 8px;border-radius:8px}
+.pbox .pr.cur{background:var(--acc-soft);animation:fadeUp .45s ease}
+.pbox .pr.old{opacity:.7}
+.rsn{color:var(--teal);font-weight:800;font-size:.9em}
+.rsn .zh{font-weight:600}

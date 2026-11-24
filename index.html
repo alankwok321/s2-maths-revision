@@ -229,6 +229,19 @@ table.sl th{font-family:"Nunito",sans-serif;font-size:.8em;padding:2px 8px;color
 .katex .hl3{background:#c9f2d4;border-radius:4px;box-shadow:0 0 0 2px #c9f2d4}
 .katex .red{color:var(--bad)}.katex .green{color:var(--ok)}.katex .blue{color:var(--pri)}.katex .org{color:#c2410c}.katex .pur{color:var(--pur)}
 .mcs .katex{font-size:1.1em}
+/* proofs */
+.proof{font-size:1.1em;line-height:1.9;margin-top:12px;background:#fff;border:2px dashed #c7d2fe;border-radius:12px;padding:10px 14px}
+.proof .pl{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;min-height:2.1em;line-height:1.4;padding:5px 0}
+select.pb{font:inherit;font-size:.86em;padding:3px 8px;border:2px solid #a5b4fc;border-radius:8px;background:#eef2ff;color:var(--ink);max-width:100%;cursor:pointer}
+select.pb.set{border-color:var(--pri)}
+select.pb.right{border-color:var(--ok);background:var(--ok-soft);opacity:1}
+select.pb.wrong{border-color:var(--bad);background:var(--bad-soft);opacity:1}
+.pbox{text-align:left;font-size:1.12em;line-height:1.9;background:#fff;border:2px solid var(--line);border-radius:12px;padding:10px 16px;margin:10px auto 0;max-width:600px}
+.pbox .pr{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;padding:1px 8px;border-radius:8px}
+.pbox .pr.cur{background:var(--acc-soft);animation:fadeUp .45s ease}
+.pbox .pr.old{opacity:.7}
+.rsn{color:var(--teal);font-weight:800;font-size:.9em}
+.rsn .zh{font-weight:600}
 
 </style>
 </head>
@@ -623,6 +636,14 @@ class Practice {
       q.choices.forEach((c, i) => { const key = c.replace(/\s+/g, ''); if (!seen.has(key)) { seen.add(key); ch.push({ h: c, ok: i === 0 }); } });
       ch = q.keep ? ch : shuffle(ch); q._ch = ch;
       ansH = `<div class="mcs">${ch.map((c, i) => `<button data-i="${i}"><span class="k">${KEYS[i]}</span><span>${c.h}</span></button>`).join('')}</div>`;
+    } else if (q.kind === 'proof') {
+      /* a proof: each line is a list of text segments and blanks {opts:[correct,...]} */
+      q._blanks = [];
+      ansH = `<div class="proof">${q.lines.map(ln => `<div class="pl">${ln.map(sg => {
+        if (typeof sg === 'string') return `<span>${sg}</span>`;
+        const ord = shuffle(sg.opts.map((_, k) => k)); const id = q._blanks.length; q._blanks.push(ord);
+        return `<select class="pb" data-b="${id}"><option value="">${LANG === 'zh' ? '選擇…' : 'choose…'}</option>${ord.map((k, m) => `<option value="${m}">${sg.opts[k]}</option>`).join('')}</select>`;
+      }).join(' ')}</div>`).join('')}</div><div class="ans"><button class="btn chk">${L('Check', '檢查')}</button></div>`;
     } else {
       ansH = `<div class="ans">${q.pre || ''}<input inputmode="text" autocomplete="off" placeholder="${q.needFrac ? '3/4' : 'e.g. -5, 3/4, 1 1/2'}">${q.post || ''}<button class="btn chk">${L('Check', '檢查')}</button></div>`;
     }
@@ -633,6 +654,7 @@ class Practice {
       <div class="sol"><b>${L('Solution', '解答')}</b><ol>${q.steps.map(s => `<li class="st">${s}</li>`).join('')}</ol></div></div>`;
     const card = $('.qcard', w);
     if (q.kind === 'mc') $('.mcs', card).onclick = e => { const b = e.target.closest('button'); if (b && !this.answered) this.checkMC(+b.dataset.i, card); };
+    else if (q.kind === 'proof') { $('.chk', card).onclick = () => this.checkProof(card); $$('select.pb', card).forEach(sl => sl.onchange = () => sl.classList.toggle('set', sl.value !== '')); }
     else {
       const inp = $('input', card); $('.chk', card).onclick = () => this.checkNum(inp.value, card);
       inp.onkeydown = e => { if (e.key === 'Enter') { if (this.answered) $('.nxt', card).click(); else this.checkNum(inp.value, card); } };
@@ -656,6 +678,16 @@ class Practice {
     this.extraFb = '';
     if (!ok) $('.sol', card).classList.add('show');
     this.score();
+  }
+  checkProof(card) {
+    if (this.answered) return;
+    const sels = $$('select.pb', card); const fb = $('.fb', card);
+    if (sels.some(sl => sl.value === '')) { fb.className = 'fb no'; fb.innerHTML = '⚠️ ' + L('Choose an answer for every blank.', '每個空格都要選擇答案。'); return; }
+    let right = 0;
+    sels.forEach(sl => { const ok = this.q._blanks[+sl.dataset.b][+sl.value] === 0; if (ok) right++; sl.classList.add(ok ? 'right' : 'wrong'); sl.disabled = true; });
+    $('.chk', card).disabled = true;
+    if (right < sels.length) this.extraFb = `<div style="font-weight:600;margin-top:4px">${L(`${right} of ${sels.length} correct.`, `${sels.length} 個中答對 ${right} 個。`)}</div>`;
+    this.mark(right === sels.length, card);
   }
   checkMC(i, card) {
     const ch = this.q._ch; const bs = $$('.mcs button', card);
@@ -959,6 +991,76 @@ function triAngles(P) { const a = []; for (let i = 0; i < 3; i++) { const v = P[
 const LETTERS = [['A', 'B', 'C'], ['P', 'Q', 'R'], ['X', 'Y', 'Z'], ['D', 'E', 'F'], ['L', 'M', 'N'], ['H', 'K', 'J'], ['S', 'T', 'U']];
 const TRI = '△';
 
+/* ================= proofs: reasons, blanks, animated proofs ================= */
+/* reasons in the worksheets' abbreviated form; p, q = names of parallel lines */
+function RSN(k, p = 'AB', q = 'CD') {
+  const D = {
+    given: ['given', '已知'], cside: ['common side', '公共邊'], cang: ['common ∠', '公共角'],
+    adj: ['adj. ∠s on st. line', '直線上的鄰角'], adjS: ['adj. ∠s supp.', '鄰角互補'], pt: ['∠s at a pt.', '同頂角'], vert: ['vert. opp. ∠s', '對頂角'],
+    corr: [`corr. ∠s, ${p} // ${q}`, `同位角，${p} // ${q}`], alt: [`alt. ∠s, ${p} // ${q}`, `內錯角，${p} // ${q}`], int: [`int. ∠s, ${p} // ${q}`, `同旁內角，${p} // ${q}`],
+    corrE: ['corr. ∠s equal', '同位角相等'], altE: ['alt. ∠s equal', '內錯角相等'], intS: ['int. ∠s supp.', '同旁內角互補'],
+    sum: ['∠ sum of △', '三角形內角和'], ext: ['ext. ∠ of △', '三角形外角'], base: ['base ∠s, isos. △', '等腰三角形底角'], sopp: ['sides opp. equal ∠s', '等角對邊相等'],
+    SSS: ['SSS', 'S.S.S.'], SAS: ['SAS', 'S.A.S.'], ASA: ['ASA', 'A.S.A.'], AAS: ['AAS', 'A.A.S.'], RHS: ['RHS', 'R.H.S.'],
+    csC: ['corr. sides, ≅△s', '全等三角形的對應邊'], caC: ['corr. ∠s, ≅△s', '全等三角形的對應角'],
+    AAA: ['AAA', 'A.A.A.'], s3: ['3 sides prop.', '三邊成比例'], s2: ['ratio of 2 sides, inc. ∠', '兩邊成比例且夾角相等'],
+    csS: ['corr. sides, ~△s', '相似三角形的對應邊'], caS: ['corr. ∠s, ~△s', '相似三角形的對應角'],
+    polyI: ['∠ sum of polygon', '多邊形內角和'], polyE: ['sum of ext. ∠s of polygon', '多邊形外角和'], equil: ['prop. of equil. △', '等邊三角形的特性']
+  };
+  return D[k];
+}
+/* option label for a drop-down (plain text) */
+function rlab(k, p, q) { const [e, z] = RSN(k, p, q); return LANG === 'en' ? e : LANG === 'zh' ? z : `${e}  ${z}`; }
+/* reason in brackets for display (HTML, bilingual) */
+function rsn(k, p, q) { const [e, z] = RSN(k, p, q); return `<span class="rsn">(${e})<span class="zh">${z}</span></span>`; }
+/* a blank whose correct answer is reason k; wrong = other reason keys */
+function RB(k, wrong, p, q) { return { opts: [rlab(k, p, q), ...wrong.filter(w => w !== k).map(w => rlab(w, p, q))] }; }
+/* a blank with plain-text options (first is correct) */
+function TB(right, wrong) { const seen = new Set([right]); return { opts: [right, ...wrong.filter(w => !seen.has(w) && seen.add(w))] }; }
+/* all orderings of three letters, used for naming blanks: correct first */
+function nameOpts(right) { const [a, b, c] = right.replace('△', '').split(''); return [right, ...[[a, c, b], [b, a, c], [c, b, a], [b, c, a]].map(x => '△' + x.join(''))].slice(0, 4); }
+/* proof steps for the solution list: a line with its reason */
+const PS = (stmt, k, p, q, why) => `${stmt} &nbsp;${k ? rsn(k, p, q) : ''}${why ? `<div class="sub" style="font-size:.85em">💡 ${why}</div>` : ''}`;
+
+/* animated worked proof: figs[i] (or the last given) is shown with proof lines 0..i */
+/* lines: [{s: statement HTML, r: reason key | null, p, q, c:[en,zh] caption, fig: svg (optional)}] */
+function PA(title, intro, fig0, lines, minH) {
+  const frames = [{ h: `<div>${fig0}</div>`, c: intro }];
+  let fig = fig0;
+  lines.forEach((ln, i) => {
+    if (ln.fig) fig = ln.fig;
+    const box = `<div class="pbox">${lines.slice(0, i + 1).map((l, j) => `<div class="pr ${j === i ? 'cur' : 'old'}"><span>${l.s}</span>${l.r ? rsn(l.r, l.p, l.q) : ''}</div>`).join('')}</div>`;
+    frames.push({ h: `<div>${fig}</div>${box}`, c: ln.c, d: 3800 });
+  });
+  return SL(title, frames, minH || 420);
+}
+
+/* general proof figure.
+   spec = {P:{A:[x,y],..}, segs:['AB',..], ticks:{AB:1}, arrows:{AB:1}, arcs:[{v,a,b,n,lab,c}], rights:[{v,a,b}],
+           hl:['AC'] (highlight sides), hlA:[{v,a,b}] (highlight angles), labs:{AB:'5'}, w, h, noNames:[...]} */
+function GF(spec) {
+  const P = spec.P, pts = Object.values(P); const c = G.cen(pts);
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const W = spec.w || Math.max(...xs) + 40, H = spec.h || Math.max(...ys) + 40;
+  const sg = k => [P[k[0]], P[k[1]]];
+  let s = G.open(W, H);
+  (spec.fill || []).forEach(f => { s += G.poly(f.split('').map(k => P[k]), { fill: '#eef2ff', c: 'none', w: 0 }); });
+  (spec.hl || []).forEach(k => { const [a, b] = sg(k); s += G.line(a, b, { c: '#f59e0b', w: 9 }).replace('stroke-linecap="round"', 'stroke-linecap="round" opacity=".55"'); });
+  (spec.hlA || []).forEach(o => { const v = P[o.v], r = 34; const a1 = Math.atan2(P[o.a][1] - v[1], P[o.a][0] - v[0]); let d = Math.atan2(P[o.b][1] - v[1], P[o.b][0] - v[0]) - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d <= -Math.PI) d += 2 * Math.PI;
+    const p1 = [v[0] + r * Math.cos(a1), v[1] + r * Math.sin(a1)], p2 = [v[0] + r * Math.cos(a1 + d), v[1] + r * Math.sin(a1 + d)];
+    s += `<path d="M${v[0]},${v[1]} L${p1[0].toFixed(1)},${p1[1].toFixed(1)} A${r},${r} 0 0 ${d > 0 ? 1 : 0} ${p2[0].toFixed(1)},${p2[1].toFixed(1)} Z" fill="rgba(245,158,11,.45)"/>`; });
+  (spec.segs || []).forEach(k => { const [a, b] = sg(k); s += G.line(a, b, spec.dash && spec.dash.includes(k) ? { dash: '6 5', c: '#64748b' } : {}); });
+  for (const k in spec.ticks || {}) { const [a, b] = sg(k); s += G.ticks(a, b, spec.ticks[k]); }
+  for (const k in spec.arrows || {}) { const [a, b] = sg(k); s += G.arrows(a, b, spec.arrows[k]); }
+  (spec.rights || []).forEach(o => { s += G.right(P[o.v], P[o.a], P[o.b]); });
+  (spec.arcs || []).filter(o => o.sec).forEach(o => { const v = P[o.v], r = (o.r || 22) + 2; const a1 = Math.atan2(P[o.a][1] - v[1], P[o.a][0] - v[0]); let d = Math.atan2(P[o.b][1] - v[1], P[o.b][0] - v[0]) - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d <= -Math.PI) d += 2 * Math.PI;
+    const p1 = [v[0] + r * Math.cos(a1), v[1] + r * Math.sin(a1)], p2 = [v[0] + r * Math.cos(a1 + d), v[1] + r * Math.sin(a1 + d)];
+    s += `<path d="M${v[0]},${v[1]} L${p1[0].toFixed(1)},${p1[1].toFixed(1)} A${r},${r} 0 0 ${d > 0 ? 1 : 0} ${p2[0].toFixed(1)},${p2[1].toFixed(1)} Z" fill="${o.n === 2 ? 'rgba(37,99,235,.18)' : 'rgba(220,38,38,.16)'}"/>`; });
+  (spec.arcs || []).forEach(o => { s += G.arc(P[o.v], P[o.a], P[o.b], { n: o.n || 1, label: o.lab, c: o.c || G.COL.a, r: o.r || 22, italic: o.lab && /^[a-z]$/.test(o.lab) }); });
+  for (const k in spec.labs || {}) { const [a, b] = sg(k); s += G.slabel(a, b, c, spec.labs[k]); }
+  for (const k in P) { if ((spec.noNames || []).includes(k)) continue; if (spec.off && spec.off[k]) s += G.txt(G.add(P[k], spec.off[k]), k, { size: 15, italic: true }); else s += G.vlabel(P[k], c, k); }
+  return s + '</svg>';
+}
+
 /* ================= Book 1B Ch12 Congruent Triangles ================= */
 (function () {
   const COND = {
@@ -1127,6 +1229,89 @@ const TRI = '△';
   });
 })();
 
+/* ================= Ch12 proofs: writing congruence proofs with reasons ================= */
+(function () {
+  const C12 = CH.find(c => c.id === 'ch12');
+  const KITE = { A: [170, 20], B: [50, 140], C: [170, 260], D: [290, 140] };
+  const BOW = { A: [40, 40], B: [60, 210], E: [180, 120], C: [320, 200], D: [300, 30] };
+  const ISO = { A: [170, 20], B: [40, 230], M: [170, 230], C: [300, 230] };
+  const kite = (o = {}) => GF({ P: KITE, segs: ['AB', 'BC', 'CD', 'DA', 'AC'], w: 330, h: 290, ...o });
+  const bow = (o = {}) => GF({ P: BOW, segs: ['AC', 'BD', 'AB', 'DC'], off: { E: [28, 4] }, w: 350, h: 240, ...o });
+  const iso = (o = {}) => GF({ P: ISO, segs: ['AB', 'AC', 'BC', 'AM'], off: { M: [0, 22] }, w: 340, h: 260, rights: [{ v: 'M', a: 'A', b: 'C' }], ...o });
+
+  /* ---------- lessons ---------- */
+  const checklist = box('rule', L('Proof checklist', '證明清單'), `<ol style="margin:4px 0;padding-left:22px">
+    <li>${L('Start: “In △ABC and △DEF,”', '開始：「在 △ABC 和 △DEF 中，」')}</li>
+    <li>${L('Write 3 pairs of equal parts — <b>each with a reason</b>.', '寫出 3 對相等的部分——<b>每對都要寫理由</b>。')}</li>
+    <li>${L('Conclude: ∴ △ABC ≅ △DEF (condition). Letters must be in <b>matching order</b>.', '結論：∴ △ABC ≅ △DEF（條件）。字母要按<b>對應次序</b>。')}</li>
+    <li>${L('Then you may use (corr. sides, ≅△s) or (corr. ∠s, ≅△s).', '之後才可用（全等三角形的對應邊 / 對應角）。')}</li></ol>`) +
+    `<table class="t"><tr><th>${L('What you see in the figure', '圖中看到')}</th><th>${L('Reason', '理由')}</th></tr>
+    <tr><td>${L('marks / told in the question', '記號 / 題目給出')}</td><td>${rsn('given')}</td></tr>
+    <tr><td>${L('a side shared by both triangles', '兩個三角形共用的邊')}</td><td>${rsn('cside')}</td></tr>
+    <tr><td>${L('an X shape (two lines crossing)', 'X 形（兩線相交）')}</td><td>${rsn('vert')}</td></tr>
+    <tr><td>${L('parallel lines (Z shape)', '平行線（Z 形）')}</td><td>${rsn('alt', 'AB', 'DC')}</td></tr></table>`;
+
+  const lessonCommon = {
+    t: ['Proof with a common side', '有公共邊的證明'],
+    body: checklist,
+    anim: () => PA(L('Prove △ABC ≅ △ADC, then BC = DC', '證明 △ABC ≅ △ADC，然後證明 BC = DC'), ['Marks: AB = AD and ∠BAC = ∠DAC.', '記號：AB = AD，∠BAC = ∠DAC。'],
+      kite({ ticks: { AB: 1, DA: 1 }, arcs: [{ v: 'A', a: 'B', b: 'C', sec: 1 }, { v: 'A', a: 'C', b: 'D', sec: 1 }] }), [
+      { s: L('In △ABC and △ADC,', '在 △ABC 和 △ADC 中，'), c: ['Step 1: name the two triangles.', '第 1 步：寫出兩個三角形。'] },
+      { s: 'AB = AD', r: 'given', fig: kite({ ticks: { AB: 1, DA: 1 }, hl: ['AB', 'DA'], arcs: [{ v: 'A', a: 'B', b: 'C', sec: 1 }, { v: 'A', a: 'C', b: 'D', sec: 1 }] }), c: ['The tick marks show AB = AD → (given).', '短線記號表示 AB = AD →（已知）。'] },
+      { s: '∠BAC = ∠DAC', r: 'given', fig: kite({ ticks: { AB: 1, DA: 1 }, hlA: [{ v: 'A', a: 'B', b: 'C' }, { v: 'A', a: 'C', b: 'D' }] }), c: ['The arcs show the two angles at A are equal → (given).', '弧形記號表示 A 的兩個角相等 →（已知）。'] },
+      { s: 'AC = AC', r: 'cside', fig: kite({ ticks: { AB: 1, DA: 1 }, hl: ['AC'] }), c: ['AC is in BOTH triangles → (common side). Students often forget this line!', 'AC 同時在兩個三角形中 →（公共邊）。同學常常漏寫這一行！'] },
+      { s: '∴ △ABC ≅ △ADC', r: 'SAS', c: ['Side – angle between – side → SAS. Order: A↔A, B↔D, C↔C.', '邊－夾角－邊 → S.A.S.。次序：A↔A、B↔D、C↔C。'] },
+      { s: '∴ BC = DC', r: 'csC', fig: kite({ ticks: { AB: 1, DA: 1 }, hl: ['BC', 'CD'] }), c: ['Only AFTER proving ≅ can we say corresponding sides are equal.', '證明了全等之後，才可說對應邊相等。'] }
+    ], 470)
+  };
+  const lessonVert = {
+    t: ['Proof with vertically opposite angles', '用對頂角的證明'],
+    body: B('When two lines cross (an X shape), the opposite angles are equal: (vert. opp. ∠s). This often gives the angle you need.', '兩線相交（X 形）時，對頂角相等：（對頂角）。這通常就是你需要的角。'),
+    anim: () => PA(L('Prove △ABE ≅ △CDE', '證明 △ABE ≅ △CDE'), ['AE = CE and BE = DE (marked). AC and BD cross at E.', 'AE = CE，BE = DE（有記號）。AC 和 BD 相交於 E。'],
+      bow({ ticks: { AE: 1, EC: 1, BE: 2, ED: 2 } }), [
+      { s: L('In △ABE and △CDE,', '在 △ABE 和 △CDE 中，'), c: ['Name the triangles.', '寫出兩個三角形。'] },
+      { s: 'AE = CE', r: 'given', fig: bow({ ticks: { AE: 1, EC: 1, BE: 2, ED: 2 }, hl: ['AE', 'EC'] }), c: ['Single ticks.', '單短線記號。'] },
+      { s: '∠AEB = ∠CED', r: 'vert', fig: bow({ ticks: { AE: 1, EC: 1, BE: 2, ED: 2 }, hlA: [{ v: 'E', a: 'A', b: 'B' }, { v: 'E', a: 'C', b: 'D' }] }), c: ['Not marked — but they are opposite angles of the X → (vert. opp. ∠s).', '沒有記號——但它們是 X 形的對頂角 →（對頂角）。'] },
+      { s: 'BE = DE', r: 'given', fig: bow({ ticks: { AE: 1, EC: 1, BE: 2, ED: 2 }, hl: ['BE', 'ED'] }), c: ['Double ticks.', '雙短線記號。'] },
+      { s: '∴ △ABE ≅ △CDE', r: 'SAS', c: ['The angle at E is between the two sides → SAS. A↔C, B↔D, E↔E.', 'E 的角在兩邊之間 → S.A.S.。A↔C、B↔D、E↔E。'] }
+    ], 440)
+  };
+  const idx = C12.lessons.findIndex(l => l.t[0] === 'Writing a congruence proof');
+  C12.lessons.splice(idx + 1, 0, lessonCommon, lessonVert);
+
+  /* ---------- practice: complete the proof ---------- */
+  const POOL = ['given', 'cside', 'vert', 'alt', 'base', 'csC', 'adj'];
+  const CONDS = ['SSS', 'SAS', 'ASA', 'AAS', 'RHS'];
+  const T = [
+    () => ({ fig: kite({ ticks: { AB: 1, DA: 1, BC: 2, CD: 2 } }), tri: ['△ABC', '△ADC'], rows: [['AB = AD', 'given'], ['BC = DC', 'given'], ['AC = AC', 'cside']], cond: 'SSS', after: ['∠ABC = ∠ADC', 'caC'] }),
+    () => ({ fig: kite({ ticks: { AB: 1, DA: 1 }, arcs: [{ v: 'A', a: 'B', b: 'C', sec: 1 }, { v: 'A', a: 'C', b: 'D', sec: 1 }] }), tri: ['△ABC', '△ADC'], rows: [['AB = AD', 'given'], ['∠BAC = ∠DAC', 'given'], ['AC = AC', 'cside']], cond: 'SAS', after: ['BC = DC', 'csC'] }),
+    () => ({ fig: kite({ arcs: [{ v: 'A', a: 'B', b: 'C', sec: 1 }, { v: 'A', a: 'C', b: 'D', sec: 1 }, { v: 'C', a: 'A', b: 'B', n: 2, sec: 1 }, { v: 'C', a: 'D', b: 'A', n: 2, sec: 1 }] }), tri: ['△ABC', '△ADC'], rows: [['∠BAC = ∠DAC', 'given'], ['AC = AC', 'cside'], ['∠BCA = ∠DCA', 'given']], cond: 'ASA', after: ['AB = AD', 'csC'] }),
+    () => ({ fig: bow({ ticks: { AE: 1, EC: 1, BE: 2, ED: 2 } }), tri: ['△ABE', '△CDE'], rows: [['AE = CE', 'given'], ['∠AEB = ∠CED', 'vert'], ['BE = DE', 'given']], cond: 'SAS', after: ['AB = CD', 'csC'] }),
+    () => ({ fig: bow({ ticks: { AE: 1, EC: 1 }, arrows: { AB: 1, DC: 1 } }), tri: ['△ABE', '△CDE'], rows: [['∠BAE = ∠DCE', 'alt', 'AB', 'DC'], ['AE = CE', 'given'], ['∠AEB = ∠CED', 'vert']], cond: 'ASA', after: ['BE = DE', 'csC'] }),
+    () => ({ fig: bow({ ticks: { BE: 2, ED: 2 }, arrows: { AB: 1, DC: 1 } }), tri: ['△ABE', '△CDE'], rows: [['∠BAE = ∠DCE', 'alt', 'AB', 'DC'], ['∠AEB = ∠CED', 'vert'], ['BE = DE', 'given']], cond: 'AAS', after: ['AE = CE', 'csC'] }),
+    () => ({ fig: iso({ ticks: { AB: 1, AC: 1 } }), tri: ['△ABM', '△ACM'], rows: [['∠AMB = ∠AMC = 90°', 'given'], ['AB = AC', 'given'], ['AM = AM', 'cside']], cond: 'RHS', after: ['BM = CM', 'csC'] }),
+    () => ({ fig: iso({ ticks: { AB: 1, AC: 1, BM: 2, MC: 2 }, rights: [] }), tri: ['△ABM', '△ACM'], rows: [['AB = AC', 'given'], ['BM = CM', 'given'], ['AM = AM', 'cside']], cond: 'SSS', after: ['∠ABM = ∠ACM', 'caC'] })
+  ];
+  const WHY = { given: ['marked in the figure / told in the question', '圖中有記號 / 題目給出'], cside: ['the side is in BOTH triangles', '該邊同時屬於兩個三角形'], vert: ['opposite angles where two lines cross', '兩線相交的對頂角'], alt: ['Z-shape between parallel lines', '平行線之間的 Z 形'], csC: ['corresponding sides of congruent triangles', '全等三角形的對應邊'], caC: ['corresponding angles of congruent triangles', '全等三角形的對應角'] };
+  const why = k => WHY[k] ? L(WHY[k][0], WHY[k][1]) : '';
+
+  C12.gens.unshift({
+    id: 'pfcong', name: ['Write the proof', '寫證明'], gen() {
+      const t = pick(T)(); const withAfter = Math.random() < .6;
+      const lines = [[L(`In ${t.tri[0]} and ${t.tri[1]},`, `在 ${t.tri[0]} 和 ${t.tri[1]} 中，`)]];
+      t.rows.forEach(([st, k, p, q]) => lines.push([st, RB(k, shuffle(POOL).slice(0, 3), p, q)]));
+      lines.push([`∴ ${t.tri[0]} ≅`, TB(t.tri[1], nameOpts(t.tri[1])), RB(t.cond, shuffle(CONDS).slice(0, 3))]);
+      if (withAfter) lines.push([`∴ ${t.after[0]}`, RB(t.after[1], ['given', 'cside', 'csC', 'caC', 'vert'])]);
+      const steps = [L(`In ${t.tri[0]} and ${t.tri[1]},`, `在 ${t.tri[0]} 和 ${t.tri[1]} 中，`), ...t.rows.map(([st, k, p, q]) => PS(st, k, p, q, why(k))), PS(`∴ ${t.tri[0]} ≅ ${t.tri[1]}`, t.cond, null, null, L('Check the order: S = side, A = angle. Letters of the 2nd triangle follow the matching vertices.', '檢查次序：S = 邊，A = 角；第二個三角形的字母按對應頂點排列。'))];
+      if (withAfter) steps.push(PS(`∴ ${t.after[0]}`, t.after[1], null, null, why(t.after[1])));
+      return { kind: 'proof', fig: t.fig, q: L('Complete the proof. Choose the reason for each line, the name of the 2nd triangle and the condition.', '完成證明：選出每行的理由、第二個三角形的名稱及全等條件。'), lines, steps, hint: L('Shared side → common side. X shape → vert. opp. ∠s.', '共用的邊 → 公共邊；X 形 → 對頂角。') };
+    }
+  });
+  C12.keys.push(B('Proof: “In △… and △…,” → 3 equal pairs, each with a reason → ∴ △… ≅ △… (condition).', '證明：「在 △… 和 △… 中，」→ 三對相等部分，每對寫理由 → ∴ △… ≅ △…（條件）。'), B('Shared side → (common side). X shape → (vert. opp. ∠s).', '共用的邊 →（公共邊）；X 形 →（對頂角）。'));
+  C12.traps.push(B('✘ Forgetting the common side line (AC = AC)', '✘ 漏寫公共邊（AC = AC）'), B('✘ Using (corr. sides, ≅△s) BEFORE proving ≅', '✘ 未證明全等就用（全等三角形的對應邊）'));
+  C12.cheat.push(L('Common side / vert. opp. ∠s give the 3rd fact', '公共邊 / 對頂角提供第三項'));
+})();
+
 /* ================= Ch1 Similar Triangles ================= */
 (function () {
   const r1 = x => Math.round(x * 10) / 10;
@@ -1163,8 +1348,8 @@ const TRI = '△';
 
   const condSlides = () => SL(L('3 ways to show triangles are similar', '證明三角形相似的 3 個方法'), [
     { h: simFig('AAA', ['A', 'B', 'C'], ['P', 'Q', 'R'], { base: SHAPES[0], rot: 0, flip: false, k: 1.5 }) + '<div class="ex"><b>AAA</b></div>', c: ['AAA: all angles equal. (2 equal angles are enough — the 3rd must match.)', 'A.A.A.：三角都相等。（兩角相等已足夠，第三角必定相等。）'] },
-    { h: simFig('SSS', ['A', 'B', 'C'], ['P', 'Q', 'R'], { base: SHAPES[0], rot: 0, flip: false, k: 1.5 }) + '<div class="ex"><b>3 sides proportional</b></div>', c: ['All 3 pairs of sides have the same ratio.', '三對邊的比都相同。'] },
-    { h: simFig('SAS', ['A', 'B', 'C'], ['P', 'Q', 'R'], { base: SHAPES[0], rot: 0, flip: false, k: 1.5 }) + '<div class="ex"><b>2 sides prop., inc. ∠ equal</b></div>', c: ['2 pairs of sides same ratio, and the angle between them equal.', '兩對邊的比相同，且夾角相等。'] }
+    { h: simFig('SSS', ['A', 'B', 'C'], ['P', 'Q', 'R'], { base: SHAPES[0], rot: 0, flip: false, k: 1.5 }) + '<div class="ex"><b>3 sides prop.</b></div>', c: ['All 3 pairs of sides have the same ratio.', '三對邊的比都相同。'] },
+    { h: simFig('SAS', ['A', 'B', 'C'], ['P', 'Q', 'R'], { base: SHAPES[0], rot: 0, flip: false, k: 1.5 }) + '<div class="ex"><b>ratio of 2 sides, inc. ∠</b></div>', c: ['2 pairs of sides same ratio, and the angle between them equal.', '兩對邊的比相同，且夾角相等。'] }
   ], 300);
 
   const parFig = (lab) => { const A = [120, 10], Bp = [10, 200], C = [260, 200]; const D = [76, 86], E = [176, 86];
@@ -1180,7 +1365,7 @@ const TRI = '△';
     },
     {
       t: ['Conditions for similar triangles', '相似三角形的條件'],
-      body: `<table class="t"><tr><td><b>AAA</b></td><td>${L('3 angles equal', '三角相等')}</td></tr><tr><td><b>3 sides proportional</b></td><td>${L('三邊成比例', '三邊成比例')}</td></tr><tr><td><b>2 sides prop., inc. ∠ equal</b></td><td>${L('兩邊成比例且夾角相等', '兩邊成比例且夾角相等')}</td></tr></table>`,
+      body: `<table class="t"><tr><td><b>AAA</b></td><td>${L('3 angles equal', '三角相等')}</td></tr><tr><td><b>3 sides prop.</b></td><td>${L('三邊成比例', '三邊成比例')}</td></tr><tr><td><b>ratio of 2 sides, inc. ∠</b></td><td>${L('兩邊成比例且夾角相等', '兩邊成比例且夾角相等')}</td></tr></table>`,
       anim: condSlides
     },
     {
@@ -1210,7 +1395,7 @@ const TRI = '△';
   ];
 
   const N = () => shuffle(LETTERS).slice(0, 2);
-  const CN = { AAA: 'AAA', SSS: '3 sides proportional', SAS: '2 sides prop., inc. ∠ equal', NO: L('Not similar / not enough info', '不相似 / 資料不足') };
+  const CN = { AAA: 'AAA', SSS: '3 sides prop.', SAS: 'ratio of 2 sides, inc. ∠', NO: L('Not similar / not enough info', '不相似 / 資料不足') };
   const gens = [
     {
       id: 'cond', name: ['Which condition?', '哪個條件？'], gen() {
@@ -1267,8 +1452,69 @@ const TRI = '△';
     lessons, gens,
     keys: [B('~ means same shape; sizes can differ.', '~ 表示形狀相同，大小可以不同。'), B('Conditions: AAA; 3 sides proportional; 2 sides prop., inc. ∠ equal.', '條件：A.A.A.；三邊成比例；兩邊成比例且夾角相等。'), B('Corresponding sides: same ratio. Corresponding angles: equal.', '對應邊比相同；對應角相等。'), B('DE // BC → △ADE ~ △ABC.', 'DE // BC → △ADE ~ △ABC。')],
     traps: [B('✘ Using DB instead of AB for the big triangle', '✘ 大三角形用了 DB 而不是 AB'), B('✘ Mixing up the order of the ratio (big/small vs small/big)', '✘ 比的次序混亂（大/小 與 小/大）'), B('✘ Similar means equal sides &nbsp; ✔ only proportional', '✘ 相似即邊相等 &nbsp; ✔ 只是成比例')],
-    cheat: [`AAA · 3 sides prop. · 2 sides prop., inc. ∠`, `${fr('AB', 'PQ')} = ${fr('BC', 'QR')} = ${fr('CA', 'RP')}`, 'DE // BC → △ADE ~ △ABC']
+    cheat: [`AAA · 3 sides prop. · ratio of 2 sides, inc. ∠`, `${fr('AB', 'PQ')} = ${fr('BC', 'QR')} = ${fr('CA', 'RP')}`, 'DE // BC → △ADE ~ △ABC']
   });
+})();
+
+/* ================= Ch1 proofs: similar triangles with reasons ================= */
+(function () {
+  const C1 = CH.find(c => c.id === 'ch1');
+  const TP = { A: [150, 20], B: [30, 260], C: [300, 260], D: [95.5, 128], E: [217.5, 128] };
+  const par = (o = {}) => GF({ P: TP, segs: ['AB', 'AC', 'BC', 'DE'], w: 340, h: 290, ...o });
+  const BW = { A: [40, 40], B: [50, 190], E: [150, 120], C: [315, 240], D: [300, 15] };
+  const bow = (o = {}) => GF({ P: BW, segs: ['AC', 'BD', 'AB', 'DC'], off: { E: [-2, -20] }, w: 345, h: 275, ...o });
+
+  const lessonPar = {
+    t: ['Proof: parallel line in a triangle', '證明：三角形內的平行線'],
+    body: box('rule', L('Proof checklist', '證明清單'), `<ol style="margin:4px 0;padding-left:22px"><li>${L('“In △ADE and △ABC,”', '「在 △ADE 和 △ABC 中，」')}</li><li>${L('Give equal angles (or side ratios) <b>with reasons</b>.', '寫出相等的角（或邊的比）<b>及理由</b>。')}</li><li>${L('∴ △ADE ~ △ABC (AAA / 3 sides prop. / ratio of 2 sides, inc. ∠)', '∴ △ADE ~ △ABC（A.A.A. / 三邊成比例 / 兩邊成比例且夾角相等）')}</li><li>${L('Then use (corr. sides, ~△s) to find lengths.', '然後用（相似三角形的對應邊）求長度。')}</li></ol>`),
+    anim: () => PA(L('DE // BC. Prove △ADE ~ △ABC', 'DE // BC。證明 △ADE ~ △ABC'), ['DE is parallel to BC.', 'DE 與 BC 平行。'], par({ arrows: { DE: 1, BC: 1 } }), [
+      { s: L('In △ADE and △ABC,', '在 △ADE 和 △ABC 中，'), c: ['Name the small and the big triangle.', '寫出小三角形和大三角形。'] },
+      { s: '∠DAE = ∠BAC', r: 'cang', fig: par({ arrows: { DE: 1, BC: 1 }, hlA: [{ v: 'A', a: 'D', b: 'E' }] }), c: ['The angle at A is in BOTH triangles → (common ∠).', 'A 的角同時屬於兩個三角形 →（公共角）。'] },
+      { s: '∠ADE = ∠ABC', r: 'corr', p: 'DE', q: 'BC', fig: par({ arrows: { DE: 1, BC: 1 }, hlA: [{ v: 'D', a: 'A', b: 'E' }, { v: 'B', a: 'A', b: 'C' }] }), c: ['Same position at the two parallel lines (F shape) → (corr. ∠s, DE // BC).', '在兩條平行線的相同位置（F 形）→（同位角，DE // BC）。'] },
+      { s: '∠AED = ∠ACB', r: 'corr', p: 'DE', q: 'BC', fig: par({ arrows: { DE: 1, BC: 1 }, hlA: [{ v: 'E', a: 'A', b: 'D' }, { v: 'C', a: 'A', b: 'B' }] }), c: ['Same idea on the other side.', '另一邊也一樣。'] },
+      { s: '∴ △ADE ~ △ABC', r: 'AAA', c: ['3 pairs of equal angles → AAA. Order: A↔A, D↔B, E↔C.', '三對角相等 → A.A.A.。次序：A↔A、D↔B、E↔C。'] },
+      { s: `∴ ${fr('DE', 'BC')} = ${fr('AD', 'AB')}`, r: 'csS', c: ['Now corresponding sides are in the same ratio.', '現在對應邊成比例。'] }
+    ], 480)
+  };
+  const lessonBow = {
+    t: ['Proof: parallel lines and an X shape', '證明：平行線及 X 形'],
+    body: B('With AB // DC and lines crossing at E, use (alt. ∠s, AB // DC) and (vert. opp. ∠s).', '當 AB // DC 而兩線相交於 E，用（內錯角，AB // DC）和（對頂角）。'),
+    anim: () => PA(L('AB // DC. Prove △ABE ~ △CDE', 'AB // DC。證明 △ABE ~ △CDE'), ['AB is parallel to DC; AC and BD cross at E.', 'AB 與 DC 平行；AC 和 BD 相交於 E。'], bow({ arrows: { AB: 1, DC: 1 } }), [
+      { s: L('In △ABE and △CDE,', '在 △ABE 和 △CDE 中，'), c: ['Name the triangles.', '寫出兩個三角形。'] },
+      { s: '∠BAE = ∠DCE', r: 'alt', p: 'AB', q: 'DC', fig: bow({ arrows: { AB: 1, DC: 1 }, hlA: [{ v: 'A', a: 'B', b: 'E' }, { v: 'C', a: 'D', b: 'E' }] }), c: ['Z shape between AB and DC → alternate angles.', 'AB 與 DC 之間的 Z 形 → 內錯角。'] },
+      { s: '∠ABE = ∠CDE', r: 'alt', p: 'AB', q: 'DC', fig: bow({ arrows: { AB: 1, DC: 1 }, hlA: [{ v: 'B', a: 'A', b: 'E' }, { v: 'D', a: 'C', b: 'E' }] }), c: ['Another Z shape.', '另一個 Z 形。'] },
+      { s: '∠AEB = ∠CED', r: 'vert', fig: bow({ arrows: { AB: 1, DC: 1 }, hlA: [{ v: 'E', a: 'A', b: 'B' }, { v: 'E', a: 'C', b: 'D' }] }), c: ['X shape at E → vertically opposite angles.', 'E 的 X 形 → 對頂角。'] },
+      { s: '∴ △ABE ~ △CDE', r: 'AAA', c: ['A↔C, B↔D, E↔E.', 'A↔C、B↔D、E↔E。'] }
+    ], 470)
+  };
+  const at = C1.lessons.findIndex(l => l.t[0] === 'Parallel line in a triangle');
+  C1.lessons.splice(at + 1, 0, lessonPar, lessonBow);
+
+  /* tidy condition names to the worksheet form */
+  const POOLA = ['cang', 'corr', 'alt', 'vert', 'given', 'sum'];
+  const CONDS = ['AAA', 's3', 's2', 'SAS'];
+  const T = [
+    () => ({ fig: par({ arrows: { DE: 1, BC: 1 } }), tri: ['△ADE', '△ABC'], rows: [['∠DAE = ∠BAC', 'cang'], ['∠ADE = ∠ABC', 'corr', 'DE', 'BC'], ['∠AED = ∠ACB', 'corr', 'DE', 'BC']], cond: 'AAA', after: [`${fr('DE', 'BC')} = ${fr('AD', 'AB')}`, 'csS'] }),
+    () => ({ fig: bow({ arrows: { AB: 1, DC: 1 } }), tri: ['△ABE', '△CDE'], rows: [['∠BAE = ∠DCE', 'alt', 'AB', 'DC'], ['∠ABE = ∠CDE', 'alt', 'AB', 'DC'], ['∠AEB = ∠CED', 'vert']], cond: 'AAA', after: [`${fr('AB', 'CD')} = ${fr('AE', 'CE')}`, 'csS'] }),
+    () => { const k = pick([2, 3]); const ad = ri(2, 5), ae = ri(2, 6); return { fig: par({ labs: { AD: ad, DB: ad * (k - 1), AE: ae, EC: ae * (k - 1) } }), tri: ['△ADE', '△ABC'], rows: [[`${fr('AD', 'AB')} = ${fr(ad, ad * k)} = ${fr(1, k)}`], [`${fr('AE', 'AC')} = ${fr(ae, ae * k)} = ${fr(1, k)}`], ['∠DAE = ∠BAC', 'cang']], cond: 's2', after: ['∠ADE = ∠ABC', 'caS'] }; },
+    () => { const s = [ri(2, 5), ri(3, 6), ri(4, 7)], k = pick([2, 3]); return { fig: triPair(SHAPES[0], { names: ['A', 'B', 'C'], sides: { 0: { lab: s[0] }, 1: { lab: s[1] }, 2: { lab: s[2] } } }, { names: ['P', 'Q', 'R'], sides: { 0: { lab: s[0] * k }, 1: { lab: s[1] * k }, 2: { lab: s[2] * k } } }, { s: 1.3 }), tri: ['△ABC', '△PQR'], rows: [[`${fr('PQ', 'AB')} = ${fr(s[0] * k, s[0])} = ${k}`], [`${fr('QR', 'BC')} = ${fr(s[1] * k, s[1])} = ${k}`], [`${fr('RP', 'CA')} = ${fr(s[2] * k, s[2])} = ${k}`]], cond: 's3', after: ['∠B = ∠Q', 'caS'] }; }
+  ];
+  const WHY = { cang: ['the angle belongs to both triangles', '該角同時屬於兩個三角形'], corr: ['F shape at parallel lines', '平行線的 F 形'], alt: ['Z shape at parallel lines', '平行線的 Z 形'], vert: ['X shape: opposite angles', 'X 形的對頂角'], csS: ['corresponding sides of similar triangles are in the same ratio', '相似三角形的對應邊成比例'], caS: ['corresponding angles of similar triangles are equal', '相似三角形的對應角相等'] };
+  const why = k => WHY[k] ? L(WHY[k][0], WHY[k][1]) : '';
+  C1.gens.unshift({
+    id: 'pfsim', name: ['Write the proof', '寫證明'], gen() {
+      const t = pick(T)(); const withAfter = Math.random() < .6;
+      const lines = [[L(`In ${t.tri[0]} and ${t.tri[1]},`, `在 ${t.tri[0]} 和 ${t.tri[1]} 中，`)]];
+      t.rows.forEach(([st, k, p, q]) => lines.push(k ? [st, RB(k, shuffle(POOLA).slice(0, 3), p, q)] : [st]));
+      lines.push([`∴ ${t.tri[0]} ~`, TB(t.tri[1], nameOpts(t.tri[1])), RB(t.cond, CONDS)]);
+      if (withAfter) lines.push([`∴ ${t.after[0]}`, RB(t.after[1], ['csS', 'caS', 'given', 'csC', 'cang'])]);
+      const steps = [L(`In ${t.tri[0]} and ${t.tri[1]},`, `在 ${t.tri[0]} 和 ${t.tri[1]} 中，`), ...t.rows.map(([st, k, p, q]) => k ? PS(st, k, p, q, why(k)) : st), PS(`∴ ${t.tri[0]} ~ ${t.tri[1]}`, t.cond, null, null, t.cond === 'AAA' ? L('3 pairs of equal angles.', '三對角相等。') : t.cond === 's3' ? L('All 3 side ratios are the same.', '三對邊的比都相同。') : L('2 side ratios equal, and the angle between them is equal.', '兩對邊的比相同，而且夾角相等。'))];
+      if (withAfter) steps.push(PS(`∴ ${t.after[0]}`, t.after[1], null, null, why(t.after[1])));
+      return { kind: 'proof', fig: t.fig, q: L('Complete the proof. Choose each reason, the name of the 2nd triangle and the condition.', '完成證明：選出每個理由、第二個三角形的名稱及相似條件。'), lines, steps, hint: L('Parallel lines → corr./alt. ∠s. Shared angle → common ∠.', '平行線 → 同位角 / 內錯角；共用的角 → 公共角。') };
+    }
+  });
+  C1.keys.push(B('Proof: In △ADE and △ABC, ∠A common, corr./alt. ∠s from parallel lines → AAA.', '證明：在 △ADE 和 △ABC 中，∠A 是公共角，平行線給出同位角 / 內錯角 → A.A.A.。'));
+  C1.traps.push(B('✘ Writing “corr. ∠s” without the parallel lines: write (corr. ∠s, DE // BC)', '✘ 只寫「同位角」：要寫（同位角，DE // BC）'));
 })();
 
 /* ================= Ch2 Angles Related to Triangles and Polygons ================= */
@@ -1429,6 +1675,54 @@ const TRI = '△';
     traps: [B('✘ Exterior sum = (n − 2) × 180° &nbsp; ✔ 360° always', '✘ 外角和 = (n − 2) × 180° &nbsp; ✔ 一定是 360°'), B('✘ Exterior ∠ = the angle next to it &nbsp; ✔ the two OPPOSITE angles', '✘ 外角 = 相鄰的內角 &nbsp; ✔ 兩個內對角之和'), B('✘ Base angles are the ones next to the equal sides’ meeting point &nbsp; ✔ they are at the base', '✘ 把頂角當成底角 &nbsp; ✔ 底角在底邊兩端')],
     cheat: [`${L('ext. ∠ of △', '三角形外角')} = a + b`, `${L('Interior sum', '內角和')} = (n − 2) × 180°`, `${L('Exterior sum', '外角和')} = 360°`, `${L('Regular', '正多邊形')}: ${L('ext.', '外角')} = 360° ÷ n`]
   });
+})();
+
+/* ================= Ch2 proofs: angle questions written with reasons ================= */
+(function () {
+  const C2 = CH.find(c => c.id === 'ch2');
+  const IS = { A: [150, 20], B: [40, 210], C: [260, 210], D: [370, 210] };
+  const isoF = (o = {}) => GF({ P: IS, segs: ['AB', 'AC', 'BD'], w: 390, h: 240, ...o });
+  function pent(labs, hl) { /* pentagon ABCDE with angle labels */
+    const N = ['A', 'B', 'C', 'D', 'E']; const P = {}; N.forEach((k, i) => { const t = -Math.PI / 2 + 2 * Math.PI * i / 5 + (i % 2 ? .1 : -.05); const r = i === 3 ? 95 : 110; P[k] = [170 + r * Math.cos(t), 140 + r * Math.sin(t)]; });
+    const arcs = N.map((k, i) => ({ v: k, a: N[(i + 1) % 5], b: N[(i + 4) % 5], lab: labs[i], c: labs[i] === 'x' ? G.COL.a : G.COL.b, r: 20 }));
+    return GF({ P, segs: ['AB', 'BC', 'CD', 'DE', 'EA'], arcs, hlA: hl ? N.map((k, i) => ({ v: k, a: N[(i + 1) % 5], b: N[(i + 4) % 5] })) : [], w: 340, h: 270 });
+  }
+
+  const lessonWrite = {
+    t: ['Writing angle answers with reasons', '寫出求角的理由'],
+    body: box('rule', L('Every equation needs a reason', '每條方程都要寫理由'), ul([B('Write the equation first, then the reason in brackets.', '先寫方程，再在括號內寫理由。'), B('Lines that only do arithmetic (solving) need no reason.', '只是計算（求解）的行不用寫理由。')])) +
+      `<table class="t"><tr><td>${rsn('ext')}</td><td>${rsn('base')}</td></tr><tr><td>${rsn('sum')}</td><td>${rsn('adj')}</td></tr><tr><td>${rsn('polyI')}</td><td>${rsn('polyE')}</td></tr><tr><td>${rsn('sopp')}</td><td>${rsn('equil')}</td></tr></table>`,
+    anim: () => PA(L('Find x in the pentagon', '求五邊形中的 x'), ['Four angles are given: 100°, 120°, 95°, 110°.', '已知四個角：100°、120°、95°、110°。'], pent(['x', '100°', '120°', '95°', '110°']), [
+      { s: '(5 − 2) × 180° = 540°', r: 'polyI', fig: pent(['x', '100°', '120°', '95°', '110°'], true), c: ['First find the angle sum of a pentagon.', '先求五邊形的內角和。'] },
+      { s: 'x + 100° + 120° + 95° + 110° = 540°', r: 'polyI', c: ['All 5 angles add to 540°. Write the reason again.', '5 個角加起來是 540°，再寫一次理由。'] },
+      { s: 'x + 425° = 540°', c: ['Just arithmetic: no reason needed.', '只是計算：不用寫理由。'] },
+      { s: 'x = 115°', c: ['Done.', '完成。'] }
+    ], 460)
+  };
+  C2.lessons.push(lessonWrite);
+
+  const POOL = ['ext', 'base', 'sum', 'adj', 'polyI', 'polyE', 'vert', 'sopp'];
+  const others = k => shuffle(POOL.filter(x => x !== k)).slice(0, 3);
+  const make = (fig, q, lines, steps, hint) => ({ kind: 'proof', fig, q, lines, steps, hint });
+  const T = [
+    () => { const a = pick([20, 30, 40, 50, 60, 70, 80, 100]); const b = (180 - a) / 2;
+      return make(isoF({ ticks: { AB: 1, AC: 1 }, arcs: [{ v: 'A', a: 'B', b: 'C', lab: a + '°' }, { v: 'C', a: 'D', b: 'A', lab: 'x', c: G.COL.b }] }), L('AB = AC, BCD is a straight line. Complete the working with reasons.', 'AB = AC，BCD 是直線。完成步驟並寫理由。'),
+        [['∠ABC = ∠ACB', RB('base', others('base'))], [`∠ABC + ∠ACB + ${a}° = 180°`, RB('sum', others('sum'))], [`∠ACB = ${b}°`], [`x = 180° − ${b}° = ${180 - b}°`, RB('adj', others('adj'))]],
+        [PS('∠ABC = ∠ACB', 'base'), PS(`∠ABC + ∠ACB + ${a}° = 180°`, 'sum'), `∠ACB = ${b}°`, PS(`x = <b>${180 - b}°</b>`, 'adj')]); },
+    () => { const b = ri(35, 75); const x = 180 - b; /* AB = AC, base angle b, ext at C... use ext angle: x = ∠A + ∠B */
+      const A = 180 - 2 * b; return make(isoF({ ticks: { AB: 1, AC: 1 }, arcs: [{ v: 'B', a: 'C', b: 'A', lab: b + '°', c: G.COL.b }, { v: 'C', a: 'D', b: 'A', lab: 'x', c: G.COL.c }] }), L('AB = AC, BCD is a straight line. Find x with reasons.', 'AB = AC，BCD 是直線。寫出理由求 x。'),
+        [['∠ACB = ' + b + '°', RB('base', others('base'))], [`∠BAC = 180° − ${b}° − ${b}° = ${A}°`, RB('sum', others('sum'))], [`x = ${A}° + ${b}° = ${x}°`, RB('ext', others('ext'))]],
+        [PS(`∠ACB = ${b}°`, 'base'), PS(`∠BAC = ${A}°`, 'sum'), PS(`x = <b>${x}°</b>`, 'ext')]); },
+    () => { const angs = [ri(95, 125), ri(100, 130), ri(90, 120), ri(100, 125)]; const x = 540 - angs.reduce((a, b) => a + b); if (x < 70 || x > 150) return null;
+      return make(pent(['x', ...angs.map(a => a + '°')]), L('Find x. Complete the working with reasons.', '求 x。完成步驟並寫理由。'),
+        [[`x + ${angs.join('° + ')}° = (5 − 2) × 180°`, RB('polyI', others('polyI'))], [`x = 540° − ${angs.reduce((a, b) => a + b)}° = ${x}°`]],
+        [PS(`x + ${angs.join('° + ')}° = 540°`, 'polyI'), `x = <b>${x}°</b>`]); },
+    () => { const e = [ri(50, 90), ri(60, 100), ri(50, 90), ri(40, 80)]; const x = 360 - e.reduce((a, b) => a + b); if (x < 30 || x > 120) return null;
+      return make(null, L(`The exterior angles of a pentagon are ${e.join('°, ')}° and x. Complete the working.`, `五邊形的外角是 ${e.join('°、')}° 和 x。完成步驟。`),
+        [[`x + ${e.join('° + ')}° = 360°`, RB('polyE', others('polyE'))], [`x = ${x}°`]], [PS(`x + ${e.join('° + ')}° = 360°`, 'polyE'), `x = <b>${x}°</b>`]); }
+  ];
+  C2.gens.unshift({ id: 'pfang', name: ['Write with reasons', '寫出理由'], gen() { return pick(T)(); } });
+  C2.keys.push(B('Every equation gets a reason; arithmetic lines do not.', '每條方程都要寫理由；純計算的行不用。'));
 })();
 
 /* ================= Ch3 Identities ================= */
@@ -1986,6 +2280,91 @@ const TRI = '△';
     traps: [B('✘ Using “alt. ∠s, AB // CD” to prove AB // CD &nbsp; ✔ use “alt. ∠s equal”', '✘ 用「內錯角，AB // CD」證明 AB // CD &nbsp; ✔ 用「內錯角相等」'), B('✘ Interior angles are equal &nbsp; ✔ they add to 180°', '✘ 同旁內角相等 &nbsp; ✔ 和為 180°'), B('✘ Missing reasons in brackets', '✘ 漏寫括號內的理由')],
     cheat: ['adj. ∠s on st. line · vert. opp. ∠s · ∠s at a pt.', 'corr. / alt. ∠s → =; int. ∠s → 180°', `${L('Prove //', '證明 //')}: corr. ∠s equal · alt. ∠s equal · int. ∠s supp.`, '∠ sum of △ · ext. ∠ of △']
   });
+})();
+
+/* ================= Ch11 proofs: chains of reasons ================= */
+(function () {
+  const C11 = CH.find(c => c.id === 'ch11');
+  /* parallel-line figure with points P (upper crossing) and Q (lower crossing) */
+  function PL(tx = 130, bx = 280) {
+    const T = [tx, 10], U = [bx, 250]; const at = y => [T[0] + (U[0] - T[0]) * (y - T[1]) / (U[1] - T[1]), y];
+    const P = { A: [20, 70], B: [380, 70], C: [20, 185], D: [380, 185], T, U, P: at(70), Q: at(185) };
+    const th = Math.round(Math.atan2(U[1] - T[1], U[0] - T[0]) * 180 / Math.PI); /* lr angle */
+    const ang = { lr: th, ul: th, ll: 180 - th, ur: 180 - th };
+    const ray = { ur: ['B', 'T'], ul: ['T', 'A'], ll: ['A', 'U'], lr: ['U', 'B'] };
+    const rayQ = { ur: ['D', 'T'], ul: ['T', 'C'], ll: ['C', 'U'], lr: ['U', 'D'] };
+    const arc = (at2, pos, lab, c, n) => { const [a, b] = at2 === 'P' ? ray[pos] : rayQ[pos]; return { v: at2, a, b, lab, c, n }; };
+    const hl = (at2, pos) => { const [a, b] = at2 === 'P' ? ray[pos] : rayQ[pos]; return { v: at2, a, b }; };
+    const fig = (o = {}) => GF({ P, segs: ['AB', 'CD', 'TU'], noNames: ['T', 'U'], off: { P: [-16, -14], Q: [18, 16] }, w: 400, h: 260, ...o });
+    return { ang, arc, hl, fig };
+  }
+  /* isosceles triangle with BC extended to D */
+  const IS = { A: [150, 20], B: [40, 210], C: [260, 210], D: [370, 210] };
+  const isoF = (o = {}) => GF({ P: IS, segs: ['AB', 'AC', 'BD'], w: 390, h: 240, ...o });
+
+  /* ---------- lessons ---------- */
+  const g = PL(140, 270); const vv = g.ang.ur;
+  const lessonPar = {
+    t: ['Proving lines are parallel', '證明兩線平行'],
+    body: box('rule', L('Which kind of reason?', '用哪一類理由？'), `<table class="t"><tr><th>${L('You KNOW AB // CD (use it)', '已知 AB // CD（使用它）')}</th><th>${L('You want to PROVE AB // CD', '要證明 AB // CD')}</th></tr>
+      <tr><td>${rsn('corr')}</td><td>${rsn('corrE')}</td></tr><tr><td>${rsn('alt')}</td><td>${rsn('altE')}</td></tr><tr><td>${rsn('int')}</td><td>${rsn('intS')}</td></tr></table>`) +
+      box('tip', L('How to plan a proof', '怎樣計劃證明'), ul([B('Mark every angle you know on the figure.', '把已知的角標在圖上。'), B('Find a path from what you know to what you want.', '找出由已知到所求的路線。'), B('One step per line, one reason per step.', '每行一步，每步一個理由。'), B('Finish with ∴ and the final reason.', '最後以 ∴ 和理由作結。')])),
+    anim: () => PA(L(`Prove AB // CD`, '證明 AB // CD'), [`Given the ${vv}° angles. AB // CD is NOT given — we must prove it.`, `已知兩個 ${vv}° 的角。AB // CD 不是已知，要證明。`],
+      g.fig({ arcs: [g.arc('P', 'ur', vv + '°'), g.arc('Q', 'll', vv + '°', G.COL.b), g.arc('P', 'll', 'a', G.COL.c)] }), [
+      { s: `a = ${vv}°`, r: 'vert', fig: g.fig({ arcs: [g.arc('P', 'ur', vv + '°'), g.arc('Q', 'll', vv + '°', G.COL.b), g.arc('P', 'll', 'a', G.COL.c)], hlA: [g.hl('P', 'ur'), g.hl('P', 'll')] }), c: ['a and the top ' + vv + '° angle are opposite at P (X shape).', 'a 與上面的 ' + vv + '° 是 P 的對頂角（X 形）。'] },
+      { s: `∵ a = ${vv}° = ∠CQU`, fig: g.fig({ arcs: [g.arc('P', 'ur', vv + '°'), g.arc('Q', 'll', vv + '°', G.COL.b), g.arc('P', 'll', 'a', G.COL.c)], hlA: [g.hl('P', 'll'), g.hl('Q', 'll')] }), c: ['a and the lower angle are in the SAME position (F shape) and equal.', 'a 與下面的角位置相同（F 形）而且相等。'] },
+      { s: '∴ AB // CD', r: 'corrE', c: ['We are PROVING parallel, so use “corr. ∠s equal”.', '我們在證明平行，所以用「同位角相等」。'] }
+    ], 460)
+  };
+  const lessonChain = {
+    t: ['Multi-step proofs in triangles', '三角形中的多步證明'],
+    body: B('Write one fact per line. Each new line may use the lines above it.', '每行寫一個事實；每一行都可以用上面已證明的結果。'),
+    anim: () => PA(L('AB = AC, ∠A = 40°. Find ∠ACD.', 'AB = AC，∠A = 40°。求 ∠ACD。'), ['BCD is a straight line; AB = AC.', 'BCD 是直線；AB = AC。'],
+      isoF({ ticks: { AB: 1, AC: 1 }, arcs: [{ v: 'A', a: 'B', b: 'C', lab: '40°' }] }), [
+      { s: '∠ABC = ∠ACB', r: 'base', fig: isoF({ ticks: { AB: 1, AC: 1 }, arcs: [{ v: 'A', a: 'B', b: 'C', lab: '40°' }], hlA: [{ v: 'B', a: 'C', b: 'A' }, { v: 'C', a: 'A', b: 'B' }] }), c: ['AB = AC, so the base angles are equal.', 'AB = AC，所以兩底角相等。'] },
+      { s: '∠ABC + ∠ACB + 40° = 180°', r: 'sum', c: ['Angles of △ABC add to 180°.', '△ABC 的內角和是 180°。'] },
+      { s: '2∠ACB = 140° → ∠ACB = 70°', c: ['Replace ∠ABC by ∠ACB and solve.', '把 ∠ABC 換成 ∠ACB，然後求解。'] },
+      { s: '∠ACD = 180° − 70° = 110°', r: 'adj', fig: isoF({ ticks: { AB: 1, AC: 1 }, arcs: [{ v: 'A', a: 'B', b: 'C', lab: '40°' }], hlA: [{ v: 'C', a: 'D', b: 'A' }] }), c: ['B, C, D lie on a straight line.', 'B、C、D 在一條直線上。'] }
+    ], 460)
+  };
+  C11.lessons.push(lessonPar, lessonChain);
+
+  /* ---------- practice ---------- */
+  const POOL = ['adj', 'vert', 'pt', 'corr', 'alt', 'int', 'corrE', 'altE', 'intS', 'sum', 'ext', 'base'];
+  const others = k => shuffle(POOL.filter(x => x !== k)).slice(0, 3);
+  const WHY = { adj: ['angles on a straight line add to 180°', '直線上的鄰角和為 180°'], adjS: ['the angles add up to 180°, so it is a straight line', '各角之和為 180°，所以是直線'], vert: ['X shape: opposite angles', 'X 形的對頂角'], corr: ['F shape, using AB // CD', 'F 形，用 AB // CD'], alt: ['Z shape, using AB // CD', 'Z 形，用 AB // CD'], int: ['C shape: add to 180°, using AB // CD', 'C 形：和為 180°，用 AB // CD'], corrE: ['proving // from equal corresponding angles', '由同位角相等證明平行'], altE: ['proving // from equal alternate angles', '由內錯角相等證明平行'], intS: ['proving // from interior angles adding to 180°', '由同旁內角互補證明平行'], sum: ['angles of a triangle add to 180°', '三角形內角和為 180°'], base: ['AB = AC → base angles equal', 'AB = AC → 底角相等'], ext: ['exterior angle = sum of 2 interior opposite angles', '外角 = 兩內對角之和'] };
+  const why = k => WHY[k] ? L(WHY[k][0], WHY[k][1]) : '';
+  const make = (fig, lines, steps, q, hint) => ({ kind: 'proof', fig, q: q || L('Complete the proof: choose the reason for each line.', '完成證明：選出每行的理由。'), lines, steps, hint });
+  const T = [
+    () => { /* prove parallel */ const g = PL(ri(110, 170), ri(240, 300)); const v = g.ang.ur; const kind = pick(['corrE', 'altE', 'intS']);
+      const pos = { corrE: 'll', altE: 'ur', intS: 'ul' }[kind]; const bv = kind === 'intS' ? 180 - v : v;
+      const fig = g.fig({ arcs: [g.arc('P', 'ur', v + '°'), g.arc('Q', pos, bv + '°', G.COL.b), g.arc('P', 'll', 'a', G.COL.c)] });
+      const mid = kind === 'intS' ? `∵ a + ${bv}° = ${v}° + ${bv}° = 180°` : `∵ a = ${v}° = ${L('the lower angle', '下方的角')}`;
+      return make(fig, [[`a = ${v}°`, RB('vert', others('vert'))], [mid], ['∴ AB // CD', RB(kind, ['corr', 'alt', 'int', 'corrE', 'altE', 'intS'].filter(x => x !== kind).slice(0, 3))]],
+        [PS(`a = ${v}°`, 'vert', null, null, why('vert')), mid, PS('∴ AB // CD', kind, null, null, why(kind))], null, L('We are PROVING //, so the last reason ends in “equal” or “supp.”.', '我們在證明平行，所以最後的理由是「相等」或「互補」。')); },
+    () => { /* use parallel lines: two steps */ const g = PL(ri(110, 170), ri(240, 300)); const v = g.ang.ur; const y = 180 - v; const kind = pick(['corr', 'alt', 'int']);
+      const pos = { corr: 'lr', alt: 'ul', int: 'ur' }[kind]; const x = kind === 'int' ? 180 - y : y;
+      const fig = g.fig({ arrows: { AB: 1, CD: 1 }, arcs: [g.arc('P', 'ur', v + '°'), g.arc('P', 'lr', 'y', G.COL.c), g.arc('Q', pos, 'x', G.COL.b)] });
+      const l2 = kind === 'int' ? `x + y = 180°` : 'x = y';
+      return make(fig, [[`y = 180° − ${v}° = ${y}°`, RB('adj', others('adj'))], [l2, RB(kind, others(kind))], [`∴ x = ${x}°`]],
+        [PS(`y = 180° − ${v}° = ${y}°`, 'adj', null, null, why('adj')), PS(l2, kind, null, null, why(kind)), `∴ x = <b>${x}°</b>`]); },
+    () => { /* isosceles + straight line */ const a = pick([20, 30, 40, 50, 60, 70, 80, 100]); const b = (180 - a) / 2;
+      const fig = isoF({ ticks: { AB: 1, AC: 1 }, arcs: [{ v: 'A', a: 'B', b: 'C', lab: a + '°' }, { v: 'C', a: 'D', b: 'A', lab: 'x', c: G.COL.b }] });
+      return make(fig, [['∠ABC = ∠ACB', RB('base', others('base'))], [`∠ABC + ∠ACB + ${a}° = 180°`, RB('sum', others('sum'))], [`∠ACB = ${b}°`], [`x = 180° − ${b}° = ${180 - b}°`, RB('adj', others('adj'))]],
+        [PS('∠ABC = ∠ACB', 'base', null, null, why('base')), PS(`∠ABC + ∠ACB + ${a}° = 180°`, 'sum', null, null, why('sum')), `2∠ACB = ${180 - a}° → ∠ACB = ${b}°`, PS(`x = <b>${180 - b}°</b>`, 'adj', null, null, why('adj'))], L('AB = AC, BCD is a straight line. Complete the proof to find x.', 'AB = AC，BCD 是直線。完成證明以求 x。')); },
+    () => { /* exterior angle then straight line */ const a = ri(35, 70), b = ri(35, 70);
+      const fig = isoF({ arcs: [{ v: 'A', a: 'B', b: 'C', lab: a + '°' }, { v: 'B', a: 'C', b: 'A', lab: b + '°', c: G.COL.b }, { v: 'C', a: 'D', b: 'A', lab: 'x', c: G.COL.c }, { v: 'C', a: 'A', b: 'B', lab: 'y', c: G.COL.d, r: 16 }] });
+      return make(fig, [[`x = ${a}° + ${b}° = ${a + b}°`, RB('ext', others('ext'))], [`y = 180° − ${a + b}° = ${180 - a - b}°`, RB('adj', others('adj'))]],
+        [PS(`x = ${a}° + ${b}° = ${a + b}°`, 'ext', null, null, why('ext')), PS(`y = ${180 - a - b}°`, 'adj', null, null, why('adj'))], L('BCD is a straight line. Complete the proof.', 'BCD 是直線。完成證明。')); },
+    () => { /* straight line proof */ const a = ri(30, 70), b = ri(30, 60); const c = 180 - a - b;
+      const O = [190, 175]; const dir = d => [O[0] + 150 * Math.cos(d * Math.PI / 180), O[1] - 150 * Math.sin(d * Math.PI / 180)];
+      const P = { A: dir(180), O, B: dir(0), C: dir(180 - a), D: dir(c) };
+      const fig = GF({ P, segs: ['AO', 'OB', 'OC', 'OD'], off: { O: [0, 20] }, w: 380, h: 215, arcs: [{ v: 'O', a: 'A', b: 'C', lab: a + '°', r: 30 }, { v: 'O', a: 'C', b: 'D', lab: b + '°', c: G.COL.b, r: 30 }, { v: 'O', a: 'D', b: 'B', lab: c + '°', c: G.COL.c, r: 30 }] });
+      return make(fig, [[`∵ ∠AOC + ∠COD + ∠DOB = ${a}° + ${b}° + ${c}° = 180°`], ['∴ AOB is a straight line', RB('adjS', ['adj', 'pt', 'vert', 'sum'])]],
+        [`∠AOC + ∠COD + ∠DOB = 180°`, PS(L('∴ AOB is a straight line', '∴ AOB 是一條直線'), 'adjS', null, null, why('adjS'))], L('Prove that AOB is a straight line.', '證明 AOB 是一條直線。'), L('To PROVE a straight line, use “adj. ∠s supp.”.', '要證明是直線，用「鄰角互補」。')); }
+  ];
+  C11.gens.unshift({ id: 'pfgeo', name: ['Write the proof', '寫證明'], gen() { return pick(T)(); } });
+  C11.keys.push(B('USING // → corr./alt./int. ∠s, AB // CD. PROVING // → corr. ∠s equal / alt. ∠s equal / int. ∠s supp.', '使用平行 → 同位角 / 內錯角 / 同旁內角，AB // CD；證明平行 → 同位角相等 / 內錯角相等 / 同旁內角互補。'), B('Proving a straight line → (adj. ∠s supp.)', '證明直線 →（鄰角互補）'));
 })();
 
 /* ================= Last 10 Minutes page ================= */

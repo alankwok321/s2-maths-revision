@@ -250,6 +250,14 @@ class Practice {
       q.choices.forEach((c, i) => { const key = c.replace(/\s+/g, ''); if (!seen.has(key)) { seen.add(key); ch.push({ h: c, ok: i === 0 }); } });
       ch = q.keep ? ch : shuffle(ch); q._ch = ch;
       ansH = `<div class="mcs">${ch.map((c, i) => `<button data-i="${i}"><span class="k">${KEYS[i]}</span><span>${c.h}</span></button>`).join('')}</div>`;
+    } else if (q.kind === 'proof') {
+      /* a proof: each line is a list of text segments and blanks {opts:[correct,...]} */
+      q._blanks = [];
+      ansH = `<div class="proof">${q.lines.map(ln => `<div class="pl">${ln.map(sg => {
+        if (typeof sg === 'string') return `<span>${sg}</span>`;
+        const ord = shuffle(sg.opts.map((_, k) => k)); const id = q._blanks.length; q._blanks.push(ord);
+        return `<select class="pb" data-b="${id}"><option value="">${LANG === 'zh' ? '選擇…' : 'choose…'}</option>${ord.map((k, m) => `<option value="${m}">${sg.opts[k]}</option>`).join('')}</select>`;
+      }).join(' ')}</div>`).join('')}</div><div class="ans"><button class="btn chk">${L('Check', '檢查')}</button></div>`;
     } else {
       ansH = `<div class="ans">${q.pre || ''}<input inputmode="text" autocomplete="off" placeholder="${q.needFrac ? '3/4' : 'e.g. -5, 3/4, 1 1/2'}">${q.post || ''}<button class="btn chk">${L('Check', '檢查')}</button></div>`;
     }
@@ -260,6 +268,7 @@ class Practice {
       <div class="sol"><b>${L('Solution', '解答')}</b><ol>${q.steps.map(s => `<li class="st">${s}</li>`).join('')}</ol></div></div>`;
     const card = $('.qcard', w);
     if (q.kind === 'mc') $('.mcs', card).onclick = e => { const b = e.target.closest('button'); if (b && !this.answered) this.checkMC(+b.dataset.i, card); };
+    else if (q.kind === 'proof') { $('.chk', card).onclick = () => this.checkProof(card); $$('select.pb', card).forEach(sl => sl.onchange = () => sl.classList.toggle('set', sl.value !== '')); }
     else {
       const inp = $('input', card); $('.chk', card).onclick = () => this.checkNum(inp.value, card);
       inp.onkeydown = e => { if (e.key === 'Enter') { if (this.answered) $('.nxt', card).click(); else this.checkNum(inp.value, card); } };
@@ -283,6 +292,16 @@ class Practice {
     this.extraFb = '';
     if (!ok) $('.sol', card).classList.add('show');
     this.score();
+  }
+  checkProof(card) {
+    if (this.answered) return;
+    const sels = $$('select.pb', card); const fb = $('.fb', card);
+    if (sels.some(sl => sl.value === '')) { fb.className = 'fb no'; fb.innerHTML = '⚠️ ' + L('Choose an answer for every blank.', '每個空格都要選擇答案。'); return; }
+    let right = 0;
+    sels.forEach(sl => { const ok = this.q._blanks[+sl.dataset.b][+sl.value] === 0; if (ok) right++; sl.classList.add(ok ? 'right' : 'wrong'); sl.disabled = true; });
+    $('.chk', card).disabled = true;
+    if (right < sels.length) this.extraFb = `<div style="font-weight:600;margin-top:4px">${L(`${right} of ${sels.length} correct.`, `${sels.length} 個中答對 ${right} 個。`)}</div>`;
+    this.mark(right === sels.length, card);
   }
   checkMC(i, card) {
     const ch = this.q._ch; const bs = $$('.mcs button', card);
