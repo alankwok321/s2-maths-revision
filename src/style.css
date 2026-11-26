@@ -229,3 +229,8 @@ select.pb.wrong{border-color:var(--bad);background:var(--bad-soft);opacity:1}
 .pbox .pr.old{opacity:.7}
 .rsn{color:var(--teal);font-weight:800;font-size:.9em}
 .rsn .zh{font-weight:600}
+
+.brand .logoimg{width:36px;height:36px;flex:none;display:block}
+@media (max-width:640px){.brand .logoimg{width:30px;height:30px}}
+
+@media (max-width:640px){.brand .bzh{display:none}.langs button{white-space:nowrap}}
